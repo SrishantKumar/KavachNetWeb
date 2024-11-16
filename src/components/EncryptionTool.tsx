@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { useMousePosition } from '../utils/animations';
 import InteractiveCanvas from './InteractiveCanvas';
+import { Lock, Unlock, RefreshCw } from 'lucide-react';
 
 const EncryptionTool = () => {
   const [input, setInput] = useState('');
   const [shift, setShift] = useState(3);
   const [encryptedText, setEncryptedText] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isAutoMode, setIsAutoMode] = useState(false);
   const mousePosition = useMousePosition();
 
   const encrypt = (text: string, shift: number): string => {
@@ -27,8 +29,16 @@ const EncryptionTool = () => {
   const handleEncrypt = () => {
     setIsProcessing(true);
     setTimeout(() => {
-      const result = encrypt(input, shift);
-      setEncryptedText(result);
+      if (isAutoMode) {
+        // In auto mode, use a random shift between 1-25
+        const randomShift = Math.floor(Math.random() * 25) + 1;
+        setShift(randomShift);
+        const result = encrypt(input, randomShift);
+        setEncryptedText(result);
+      } else {
+        const result = encrypt(input, shift);
+        setEncryptedText(result);
+      }
       setIsProcessing(false);
     }, 500); // Artificial delay for effect
   };
@@ -76,22 +86,36 @@ const EncryptionTool = () => {
             />
           </div>
 
-          <div className="mb-6">
-            <label className="block text-gray-300 mb-2">Shift value (1-25):</label>
-            <input
-              type="number"
-              min="1"
-              max="25"
-              value={shift}
-              onChange={(e) => setShift(Number(e.target.value))}
-              className="w-full px-4 py-2 bg-black/50 text-white rounded-lg focus:ring-2 focus:ring-red-500 focus:outline-none"
-            />
+          <div className="flex items-center space-x-4 mb-6">
+            <label className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                checked={isAutoMode}
+                onChange={(e) => setIsAutoMode(e.target.checked)}
+                className="form-checkbox text-red-500 rounded border-white/20"
+              />
+              <span className="text-gray-300">Auto-generate shift</span>
+            </label>
+
+            {!isAutoMode && (
+              <div className="flex items-center space-x-2">
+                <label className="text-gray-300">Shift value (1-25):</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="25"
+                  value={shift}
+                  onChange={(e) => setShift(Number(e.target.value))}
+                  className="w-20 px-2 py-1 bg-black/50 text-white rounded-lg focus:ring-2 focus:ring-red-500 focus:outline-none"
+                />
+              </div>
+            )}
           </div>
 
           <button
             onClick={handleEncrypt}
             disabled={isProcessing || !input}
-            className={`w-full py-3 rounded-lg font-medium mb-6 transition-all duration-300
+            className={`w-full py-3 rounded-lg font-medium mb-6 transition-all duration-300 flex items-center justify-center
               ${isProcessing || !input
                 ? 'bg-gray-600 cursor-not-allowed'
                 : 'bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800'
@@ -106,7 +130,10 @@ const EncryptionTool = () => {
                 Encrypting...
               </span>
             ) : (
-              'Encrypt Message'
+              <>
+                {isAutoMode ? <RefreshCw className="w-5 h-5 mr-2" /> : <Lock className="w-5 h-5 mr-2" />}
+                {isAutoMode ? 'Auto Encrypt' : 'Encrypt Message'}
+              </>
             )}
           </button>
 
@@ -130,6 +157,11 @@ const EncryptionTool = () => {
                   </svg>
                 </button>
               </div>
+              {isAutoMode && (
+                <p className="text-gray-400 mt-2 text-sm">
+                  Shift value used: {shift}
+                </p>
+              )}
             </div>
           )}
         </div>
