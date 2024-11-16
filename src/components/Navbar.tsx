@@ -68,14 +68,25 @@ const Navbar = () => {
       console.log('Sign in successful:', result.user);
     } catch (error: any) {
       console.error('Error signing in:', error);
-      if (error.code === 'auth/popup-blocked') {
-        alert('Please allow popups for this website to sign in with Google');
-      } else if (error.code === 'auth/cancelled-popup-request') {
-        console.log('Sign-in cancelled by user');
-      } else if (error.code === 'auth/popup-closed-by-user') {
-        console.log('Sign-in popup closed by user');
-      } else {
-        alert('Error signing in: ' + error.message);
+      
+      switch (error.code) {
+        case 'auth/operation-not-allowed':
+          alert('Error: Google Sign-In is not enabled in Firebase Console. Please contact the administrator.');
+          break;
+        case 'auth/popup-blocked':
+          alert('Error: Please allow popups for this website to sign in with Google');
+          break;
+        case 'auth/cancelled-popup-request':
+          console.log('Sign-in cancelled by user');
+          break;
+        case 'auth/popup-closed-by-user':
+          console.log('Sign-in popup closed by user');
+          break;
+        case 'auth/unauthorized-domain':
+          alert('Error: This domain is not authorized in Firebase Console. Please contact the administrator.');
+          break;
+        default:
+          alert(`Error signing in: ${error.message}`);
       }
     }
   };

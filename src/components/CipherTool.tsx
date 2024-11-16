@@ -2,16 +2,57 @@ import React, { useState, useEffect } from 'react';
 import InteractiveCanvas from './InteractiveCanvas';
 import { useMousePosition } from '../utils/animations';
 import { Lock, Unlock, Zap, Search, Clock, MapPin, AlertTriangle } from 'lucide-react';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { auth } from '../config/firebase';
+import { useDecryptionHistory } from '../hooks/useDecryptionHistory';
+
+interface CipherToolProps {
+  /**
+   * The initial message to be decrypted.
+   */
+  initialMessage?: string;
+  /**
+   * A callback function to be executed when the decryption is complete.
+   */
+  onDecryptionComplete?: () => void;
+}
 
 interface ClueAnalysis {
+  /**
+   * An array of dates mentioned in the decrypted text.
+   */
   dates: string[];
+  /**
+   * An array of locations mentioned in the decrypted text.
+   */
   locations: string[];
+  /**
+   * An array of actions mentioned in the decrypted text.
+   */
   actions: string[];
+  /**
+   * An array of security-related keywords mentioned in the decrypted text.
+   */
   keywords: string[];
+  /**
+   * The threat level of the decrypted text, which can be 'low', 'medium', or 'high'.
+   */
   threatLevel: 'low' | 'medium' | 'high';
+  /**
+   * A timeline of events mentioned in the decrypted text.
+   */
   timeline: string;
+  /**
+   * A strategy analysis of the decrypted text.
+   */
   strategy: string;
+  /**
+   * An array of context-related information mentioned in the decrypted text.
+   */
   context: string[];
+  /**
+   * An array of patterns detected in the decrypted text, including their type, description, and confidence level.
+   */
   patterns: {
     type: string;
     description: string;
@@ -19,8 +60,8 @@ interface ClueAnalysis {
   }[];
 }
 
-const CipherTool = () => {
-  const [input, setInput] = useState('');
+const CipherTool: React.FC<CipherToolProps> = ({ initialMessage = '', onDecryptionComplete }) => {
+  const [input, setInput] = useState(initialMessage);
   const [shift, setShift] = useState(3);
   const [manualDecryption, setManualDecryption] = useState('');
   const [autoDecryptions, setAutoDecryptions] = useState<string[]>([]);
@@ -28,6 +69,30 @@ const CipherTool = () => {
   const [clueAnalysis, setClueAnalysis] = useState<ClueAnalysis | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const mousePosition = useMousePosition();
+  const [user] = useAuthState(auth);
+  const { addDecryptionHistory } = useDecryptionHistory();
+
+  useEffect(() => {
+    if (initialMessage) {
+      setInput(initialMessage);
+      handleAutoDecrypt();
+    }
+  }, [initialMessage]);
+
+  const saveToHistory = async (encryptedText: string, decryptedText: string) => {
+    if (!user) return;
+    
+    await addDecryptionHistory({
+      userId: user.uid,
+      encryptedText,
+      decryptedText,
+      timestamp: new Date(),
+      method: 'auto',
+      analysis: clueAnalysis
+    });
+    
+    onDecryptionComplete?.();
+  };
 
   const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;:,.<>?';
   const charsetLength = charset.length;
@@ -568,9 +633,11 @@ const CipherTool = () => {
     }, 500);
   };
 
-  const handleAutoDecrypt = () => {
+  const handleAutoDecrypt = async () => {
+    if (!input.trim()) return;
+    
     setIsProcessing(true);
-    setTimeout(() => {
+    try {
       // Try different cipher methods
       const attempts = [
         // Caesar cipher with all possible shifts
@@ -629,7 +696,11 @@ const CipherTool = () => {
       if (bestResult.score > 50 && /\b(bomb|threat|attack|urgent|emergency)\b/i.test(bestResult.text)) {
         setClueAnalysis(analyzeText(bestResult.text));
       }
-    }, 800);
+
+      await saveToHistory(input, bestResult.text);
+    } catch (error) {
+      console.error('Error during decryption:', error);
+    }
   };
 
   return (
