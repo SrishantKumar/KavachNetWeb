@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
-import { Mail, MessageSquare, Send } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Mail, MessageSquare, Send, Loader } from 'lucide-react';
+import emailjs from '@emailjs/browser';
+import { EMAILJS_CONFIG } from '../config/emailjs';
 
 const Contact = () => {
   const [formData, setFormData] = useState({
@@ -7,13 +9,58 @@ const Contact = () => {
     email: '',
     message: ''
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitStatus, setSubmitStatus] = useState<{
+    type: 'success' | 'error' | null;
+    message: string;
+  }>({ type: null, message: '' });
+  const formRef = useRef<HTMLFormElement>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const validateForm = () => {
+    if (!formData.name.trim()) {
+      setSubmitStatus({ type: 'error', message: 'Please enter your name' });
+      return false;
+    }
+    if (!formData.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      setSubmitStatus({ type: 'error', message: 'Please enter a valid email address' });
+      return false;
+    }
+    if (!formData.message.trim()) {
+      setSubmitStatus({ type: 'error', message: 'Please enter your message' });
+      return false;
+    }
+    return true;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // In a real app, you'd handle the form submission here
-    console.log('Form submitted:', formData);
-    alert('Message sent successfully!');
-    setFormData({ name: '', email: '', message: '' });
+    setSubmitStatus({ type: null, message: '' });
+
+    if (!validateForm()) return;
+
+    setIsSubmitting(true);
+
+    try {
+      await emailjs.sendForm(
+        EMAILJS_CONFIG.serviceId,
+        EMAILJS_CONFIG.templateId,
+        formRef.current!,
+        EMAILJS_CONFIG.publicKey
+      );
+
+      setSubmitStatus({
+        type: 'success',
+        message: 'Thank you for reaching out! We\'ll get back to you soon.'
+      });
+      setFormData({ name: '', email: '', message: '' });
+    } catch (error) {
+      setSubmitStatus({
+        type: 'error',
+        message: 'Failed to send message. Please try again later.'
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -32,7 +79,7 @@ const Contact = () => {
             <div className="space-y-4">
               <div className="flex items-center gap-4 group hover:scale-105 transform transition-transform">
                 <Mail className="text-red-500 w-6 h-6 group-hover:animate-pulse" />
-                <p className="text-gray-300 group-hover:text-red-500 transition-colors">support@kavachnet.com</p>
+                <p className="text-gray-300 group-hover:text-red-500 transition-colors">srishant054@gmail.com</p>
               </div>
               <div className="flex items-center gap-4 group hover:scale-105 transform transition-transform">
                 <MessageSquare className="text-red-500 w-6 h-6 group-hover:animate-pulse" />
@@ -41,12 +88,20 @@ const Contact = () => {
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form ref={formRef} onSubmit={handleSubmit} className="space-y-6">
+            {submitStatus.message && (
+              <div className={`p-4 rounded ${
+                submitStatus.type === 'success' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'
+              }`}>
+                {submitStatus.message}
+              </div>
+            )}
             <div>
               <label htmlFor="name" className="block text-red-500 mb-2">Name</label>
               <input
                 type="text"
                 id="name"
+                name="user_name"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 className="w-full p-3 bg-gray-900 text-red-500 rounded border border-red-500/30 focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
@@ -58,6 +113,7 @@ const Contact = () => {
               <input
                 type="email"
                 id="email"
+                name="user_email"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 className="w-full p-3 bg-gray-900 text-red-500 rounded border border-red-500/30 focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
@@ -68,6 +124,7 @@ const Contact = () => {
               <label htmlFor="message" className="block text-red-500 mb-2">Message</label>
               <textarea
                 id="message"
+                name="message"
                 value={formData.message}
                 onChange={(e) => setFormData({ ...formData, message: e.target.value })}
                 rows={4}
@@ -77,10 +134,15 @@ const Contact = () => {
             </div>
             <button
               type="submit"
-              className="flex items-center gap-2 px-6 py-3 bg-red-500 text-white rounded hover:bg-red-600 focus:ring-2 focus:ring-red-500/50 transition-all transform hover:scale-105"
+              disabled={isSubmitting}
+              className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-red-500 text-white rounded hover:bg-red-600 focus:ring-2 focus:ring-red-500/50 transition-all transform hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed"
             >
-              <Send className="w-5 h-5" />
-              Send Message
+              {isSubmitting ? (
+                <Loader className="w-5 h-5 animate-spin" />
+              ) : (
+                <Send className="w-5 h-5" />
+              )}
+              {isSubmitting ? 'Sending...' : 'Send Message'}
             </button>
           </form>
         </div>

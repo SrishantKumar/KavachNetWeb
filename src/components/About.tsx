@@ -19,8 +19,8 @@ const About = () => {
     },
     {
       icon: <Key className="w-12 h-12" />,
-      title: "Multiple Ciphers",
-      description: "Support for various encryption methods and customizable settings"
+      title: "Threat Detection",
+      description: "Analyze decrypted messages for a variety of Threat Level"
     }
   ];
 

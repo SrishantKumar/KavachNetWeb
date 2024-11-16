@@ -1,4 +1,9 @@
 import React, { useEffect, useState } from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { auth } from './config/firebase';
+import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { LogIn } from 'lucide-react';
 import MatrixBackground from './components/MatrixBackground';
 import ParticleFountain from './components/ParticleFountain';
 import Navbar from './components/Navbar';
@@ -11,11 +16,14 @@ import Testimonials from './components/Testimonials';
 import Contact from './components/Contact';
 import Team from './components/Team';
 import Download from './components/Download';
+import CollaborationSpace from './components/CollaborationSpace';
 import { useMousePosition } from './utils/animations';
 
-const App = () => {
+// Home Page Component
+const HomePage = () => {
   const mousePosition = useMousePosition();
   const [scrollProgress, setScrollProgress] = useState(0);
+  const [user] = useAuthState(auth);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -53,44 +61,51 @@ const App = () => {
         <div className="absolute inset-0 bg-gradient-to-br from-red-900/20 via-black to-gray-900/30" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,_rgba(50,0,0,0.2),_rgba(0,0,0,0.9))]" />
         <MatrixBackground />
+        <ParticleFountain />
       </div>
 
-      {/* Content */}
-      <div className="relative z-10">
-        <Navbar />
-        <main>
-          <section id="home">
-            <Hero />
-          </section>
+      {/* Main Content */}
+      <main className="relative z-10">
+        <Hero />
+        <About />
+        <HowItWorks />
+        <EncryptionTool />
+        <CipherTool />
+        <Download />
 
-          <About />
+        {/* Collaboration Section */}
+        <section id="collaboration" className="py-20 px-4 relative">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+          <div className="max-w-7xl mx-auto relative">
+            <h2 className="text-3xl font-bold text-center mb-12 text-primary">
+              Secure Collaboration Space
+            </h2>
+            {user ? (
+              <CollaborationSpace />
+            ) : (
+              <div className="text-center p-8 bg-black/30 backdrop-blur-md rounded-lg border border-red-500/10">
+                <p className="text-gray-400 mb-6">
+                  Please sign in to access the collaboration space.
+                </p>
+                <button
+                  onClick={() => {
+                    const provider = new GoogleAuthProvider();
+                    signInWithPopup(auth, provider);
+                  }}
+                  className="inline-flex items-center space-x-2 px-6 py-3 rounded-md bg-red-500 hover:bg-red-600 text-white transition-colors"
+                >
+                  <LogIn size={18} />
+                  <span>Sign In with Google</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </section>
 
-          <HowItWorks />
-
-          <section id="encryption-tool" className="py-20 px-4">
-            <div className="max-w-7xl mx-auto">
-              <h2 className="text-3xl font-bold text-center mb-12 text-primary">
-                Encrypt Your Message
-              </h2>
-              <EncryptionTool />
-            </div>
-          </section>
-
-          <section id="cipher-tool" className="py-20 px-4">
-            <div className="max-w-7xl mx-auto">
-              <h2 className="text-3xl font-bold text-center mb-12 text-primary">
-                Decrypt Your Message
-              </h2>
-              <CipherTool />
-            </div>
-          </section>
-
-          <Testimonials />
-          <Download />
-          <Team />
-          <Contact />
-        </main>
-      </div>
+        <Testimonials />
+        <Team />
+        <Contact />
+      </main>
 
       {/* Footer */}
       <footer className="relative z-10 bg-black/50 backdrop-blur-sm border-t border-red-500/10 py-8">
@@ -99,11 +114,24 @@ const App = () => {
             2024 कवचNet. All rights reserved.
           </p>
           <p className="text-gray-500 mt-2 text-sm">
-            Made with ❤️ by Team DefendX
+            Made with by Team DefendX
           </p>
         </div>
       </footer>
     </div>
+  );
+};
+
+const App = () => {
+  return (
+    <Router>
+      <div className="min-h-screen bg-black">
+        <Navbar />
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+        </Routes>
+      </div>
+    </Router>
   );
 };
 
