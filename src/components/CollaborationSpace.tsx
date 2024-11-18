@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, AlertTriangle, Loader, Lock, Unlock, Clock, Users, Users2, Laptop, Share2, BarChart2, MessageSquare, Send, Tag, Plus, Map, MapPin, Radio, AlertOctagon, AlertCircle, Info, HelpCircle } from 'lucide-react';
+import { Shield, AlertTriangle, Loader, Lock, Unlock, Clock, Users, Users2, Laptop, Share2, BarChart2, MessageSquare, Send, Tag, Plus, Map, MapPin, Radio, AlertOctagon, AlertCircle, Info, HelpCircle, Trash2 } from 'lucide-react';
 import { auth } from '../config/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { useDecryptionHistory } from '../hooks/useDecryptionHistory';
@@ -8,10 +8,11 @@ import type { DecryptionHistoryItem } from '../hooks/useDecryptionHistory';
 
 const CollaborationSpace = () => {
   const [user] = useAuthState(auth);
-  const { getDecryptionHistory } = useDecryptionHistory();
+  const { getDecryptionHistory, deleteDecryptionHistory } = useDecryptionHistory();
   const [decryptionHistory, setDecryptionHistory] = useState<DecryptionHistoryItem[]>([]);
   const [selectedItem, setSelectedItem] = useState<DecryptionHistoryItem | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -31,6 +32,27 @@ const CollaborationSpace = () => {
     setLoading(false);
   };
 
+  const handleDelete = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent triggering the item selection
+    if (!id || isDeleting) return;
+
+    const confirmDelete = window.confirm('Are you sure you want to delete this item?');
+    if (!confirmDelete) return;
+
+    setIsDeleting(true);
+    try {
+      await deleteDecryptionHistory(id);
+      setDecryptionHistory(prev => prev.filter(item => item.id !== id));
+      if (selectedItem?.id === id) {
+        setSelectedItem(null);
+      }
+    } catch (error) {
+      console.error('Error deleting history item:', error);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const getThreatLevelColor = (level?: string) => {
     switch (level?.toLowerCase()) {
       case 'critical':
@@ -41,8 +63,10 @@ const CollaborationSpace = () => {
         return 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400';
       case 'low':
         return 'bg-green-500/10 border-green-500/30 text-green-400';
+      case 'unknown':
+        return 'bg-blue-500/10 border-blue-500/30 text-blue-400';
       default:
-        return 'bg-gray-500/10 border-gray-500/30 text-gray-400';
+        return 'bg-blue-500/10 border-blue-500/30 text-blue-400';
     }
   };
 
@@ -56,8 +80,10 @@ const CollaborationSpace = () => {
         return <AlertCircle className="w-5 h-5 text-yellow-500" />;
       case 'low':
         return <Info className="w-5 h-5 text-green-500" />;
+      case 'unknown':
+        return <HelpCircle className="w-5 h-5 text-blue-500" />;
       default:
-        return <HelpCircle className="w-5 h-5 text-gray-500" />;
+        return <HelpCircle className="w-5 h-5 text-blue-500" />;
     }
   };
 
@@ -94,46 +120,83 @@ const CollaborationSpace = () => {
           <div className="space-y-4">
             <div className="bg-white/[0.02] backdrop-blur-md rounded-xl p-6 border border-white/[0.05] shadow-lg relative overflow-hidden group hover:bg-white/[0.04] transition-all duration-300">
               <div className="relative z-10">
-                <h2 className="text-xl font-semibold text-white mb-6 flex items-center">
-                  <Shield className="w-5 h-5 mr-2 text-red-500" />
-                  Decryption History
-                </h2>
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-xl font-semibold text-white flex items-center">
+                    <Shield className="w-5 h-5 mr-2 text-red-500" />
+                    Decryption History
+                  </h2>
+                  {decryptionHistory.length > 0 && (
+                    <span className="text-sm text-gray-400">
+                      {decryptionHistory.length} {decryptionHistory.length === 1 ? 'item' : 'items'}
+                    </span>
+                  )}
+                </div>
+
                 {decryptionHistory.length === 0 ? (
-                  <div className="text-center py-8 text-gray-400">
-                    <Lock className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                    <p>No decryption history available</p>
+                  <div className="text-center p-8 bg-black/20 rounded-lg border border-white/[0.05]">
+                    <Shield className="w-12 h-12 text-gray-600 mx-auto mb-4" />
+                    <p className="text-gray-400">No decryption history available</p>
+                    <p className="text-sm text-gray-500 mt-2">Decrypted messages will appear here</p>
                   </div>
                 ) : (
                   <div className="space-y-4">
                     {decryptionHistory.map((item) => (
-                      <button
+                      <div
                         key={item.id}
-                        onClick={() => setSelectedItem(item)}
-                        className={`w-full text-left p-4 rounded-lg border transition-all duration-300 ${
-                          selectedItem?.id === item.id
-                            ? 'border-red-500/50 bg-white/[0.03]'
-                            : 'border-white/[0.05] hover:border-red-500/30 bg-black/20 hover:bg-white/[0.02]'
-                        }`}
+                        className={`p-4 rounded-lg border ${getThreatLevelColor(item.analysis?.threatLevel)} backdrop-blur-sm transition-all duration-300 hover:bg-white/[0.03] relative group`}
                       >
-                        <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1" onClick={() => setSelectedItem(item)}>
+                            <div className="flex items-center space-x-2 mb-2">
+                              <Lock className="w-4 h-4 text-red-500" />
+                              <span className="text-sm font-mono text-gray-300 truncate">
+                                {item.encryptedText.substring(0, 40)}...
+                              </span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Unlock className="w-4 h-4 text-green-500" />
+                              <span className="text-sm font-mono text-gray-300 truncate">
+                                {item.decryptedText.substring(0, 40)}...
+                              </span>
+                            </div>
+                          </div>
+                          
+                          <button
+                            onClick={(e) => item.id && handleDelete(item.id, e)}
+                            className="p-1.5 rounded-full opacity-0 group-hover:opacity-100 hover:bg-red-500/10 transition-all duration-200 absolute top-2 right-2"
+                            disabled={isDeleting}
+                            title="Delete"
+                          >
+                            <Trash2 className="w-4 h-4 text-red-500" />
+                          </button>
+                        </div>
+
+                        <div className="mt-3 flex items-center justify-between border-t border-white/[0.05] pt-3">
                           <div className="flex items-center space-x-2">
-                            <Lock className="w-4 h-4 text-red-500" />
-                            <span className="font-mono text-sm text-gray-300">
-                              {item.encryptedText.substring(0, 30)}...
+                            {getThreatLevelIcon(item.analysis?.threatLevel)}
+                            <span className="text-sm font-medium">
+                              {item.analysis?.threatLevel?.toUpperCase() || 'UNKNOWN'} Threat Level
+                            </span>
+                            {item.analysis?.score !== undefined && (
+                              <span className="text-xs text-gray-500">
+                                (Score: {item.analysis.score.toFixed(1)})
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center space-x-2 text-gray-500">
+                            <Clock className="w-3.5 h-3.5" />
+                            <span className="text-xs">
+                              {formatDistanceToNow(item.timestamp, { addSuffix: true })}
                             </span>
                           </div>
-                          <span className={`text-xs px-2 py-1 rounded-full border backdrop-blur-sm ${getThreatLevelColor(item.analysis?.threatLevel)}`}>
-                            {getThreatLevelIcon(item.analysis?.threatLevel)}
-                            <span className="ml-2">{item.analysis?.threatLevel?.toUpperCase() || 'UNKNOWN'} THREAT</span>
-                          </span>
                         </div>
-                        <div className="flex items-center justify-between text-sm text-gray-400">
-                          <div className="flex items-center space-x-2">
-                            <Clock className="w-3 h-3" />
-                            <span>{formatDistanceToNow(item.timestamp, { addSuffix: true })}</span>
+
+                        {item.analysis?.summary && (
+                          <div className="mt-2 text-xs text-gray-400 bg-black/20 rounded p-2">
+                            {item.analysis.summary}
                           </div>
-                        </div>
-                      </button>
+                        )}
+                      </div>
                     ))}
                   </div>
                 )}

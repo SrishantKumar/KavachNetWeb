@@ -1,68 +1,117 @@
 import { getFirestore, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
-// Indian cities for location recognition
-const INDIAN_CITIES = [
-  'Mumbai', 'Delhi', 'Bangalore', 'Hyderabad', 'Chennai', 'Kolkata', 'Pune', 'Ahmedabad', 
-  'Jaipur', 'Lucknow', 'Kanpur', 'Nagpur', 'Indore', 'Thane', 'Bhopal', 'Visakhapatnam', 
-  'Patna', 'Vadodara', 'Ghaziabad', 'Ludhiana', 'Agra', 'Nashik', 'Faridabad', 'Meerut',
-  'Rajkot', 'Varanasi', 'Srinagar', 'Aurangabad', 'Dhanbad', 'Amritsar', 'Allahabad',
-  'Ranchi', 'Howrah', 'Coimbatore', 'Jabalpur', 'Gwalior', 'Vijayawada', 'Jodhpur',
-  'Madurai', 'Raipur', 'Kota', 'Chandigarh', 'Guwahati', 'Thiruvananthapuram', 'Solapur'
+// Indian cities and states for location recognition
+const INDIAN_LOCATIONS = {
+  metropolitanCities: [
+    'Mumbai', 'Delhi', 'Bangalore', 'Hyderabad', 'Chennai', 'Kolkata', 'Pune', 'Ahmedabad'
+  ],
+  majorCities: [
+    'Jaipur', 'Lucknow', 'Kanpur', 'Nagpur', 'Indore', 'Thane', 'Bhopal', 'Visakhapatnam',
+    'Patna', 'Vadodara', 'Ghaziabad', 'Ludhiana', 'Agra', 'Nashik', 'Faridabad', 'Meerut',
+    'Rajkot', 'Varanasi', 'Srinagar', 'Aurangabad', 'Dhanbad', 'Amritsar', 'Allahabad',
+    'Ranchi', 'Howrah', 'Coimbatore', 'Jabalpur', 'Gwalior', 'Vijayawada', 'Jodhpur'
+  ],
+  states: [
+    'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh', 'Goa', 'Gujarat',
+    'Haryana', 'Himachal Pradesh', 'Jharkhand', 'Karnataka', 'Kerala', 'Madhya Pradesh',
+    'Maharashtra', 'Manipur', 'Meghalaya', 'Mizoram', 'Nagaland', 'Odisha', 'Punjab',
+    'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand',
+    'West Bengal'
+  ],
+  unionTerritories: [
+    'Andaman and Nicobar Islands', 'Chandigarh', 'Dadra and Nagar Haveli and Daman and Diu',
+    'Delhi', 'Jammu and Kashmir', 'Ladakh', 'Lakshadweep', 'Puducherry'
+  ],
+  landmarks: [
+    'Red Fort', 'India Gate', 'Gateway of India', 'Taj Mahal', 'Qutub Minar', 'Charminar',
+    'Hawa Mahal', 'Victoria Memorial', 'Golden Temple', 'Lotus Temple', 'Parliament House',
+    'Rashtrapati Bhavan'
+  ]
+};
+
+// Important locations and infrastructure
+const CRITICAL_LOCATIONS = [
+  'airport', 'station', 'railway', 'metro', 'bus terminal', 'port', 'harbor',
+  'hospital', 'school', 'college', 'university', 'mall', 'market', 'stadium',
+  'temple', 'mosque', 'church', 'gurudwara', 'embassy', 'consulate',
+  'parliament', 'assembly', 'secretariat', 'court', 'police station',
+  'military base', 'air force', 'naval base', 'army cantonment',
+  'power plant', 'nuclear plant', 'dam', 'reservoir', 'bridge', 'tunnel'
 ];
 
 // High-risk terms categorized by type
 const DANGER_WORDS = {
   critical: [
     'bomb', 'blast', 'explosion', 'detonate', 'explosive', 'suicide bomber',
-    'terrorist', 'terrorism', 'hijack', 'hostage', 'assassinate'
+    'terrorist', 'terrorism', 'hijack', 'hostage', 'assassinate', 'bioweapon',
+    'nuclear', 'chemical weapon', 'radiological', 'mass casualty', 'kill',
+    'murder', 'assassinate', 'death', 'deadly', 'lethal', 'fatal',
+    'anthrax', 'ricin', 'sarin', 'nerve agent', 'dirty bomb', 'biological weapon',
+    'mass destruction', 'genocide', 'massacre', 'execution', 'annihilation'
   ],
   severe: [
-    'kill', 'murder', 'attack', 'weapon', 'missile', 'gunman', 'shooter',
-    'militant', 'extremist', 'massacre', 'genocide'
+    'attack', 'weapon', 'missile', 'gunman', 'shooter', 'militant', 'extremist',
+    'massacre', 'genocide', 'insurgent', 'rebellion', 'uprising', 'riot',
+    'violent', 'ammunition', 'casualties', 'harm', 'dangerous', 'threat',
+    'destroy', 'damage', 'sabotage', 'assault', 'armed', 'violence',
+    'guerrilla', 'militia', 'insurgency', 'radicalization', 'extremism',
+    'cyber attack', 'data breach', 'ransomware', 'malware', 'trojan'
   ],
   high: [
-    'destroy', 'damage', 'sabotage', 'infiltrate', 'breach', 'threat',
-    'dangerous', 'emergency', 'critical', 'lethal'
+    'infiltrate', 'breach', 'threat', 'dangerous', 'emergency', 'critical',
+    'conspiracy', 'radical', 'extremism', 'subversive', 'guerrilla', 'militia',
+    'hostilities', 'fight', 'combat', 'battle', 'war', 'conflict', 'force',
+    'espionage', 'surveillance', 'intelligence', 'covert', 'classified',
+    'restricted', 'confidential', 'secret', 'top secret', 'sensitive'
   ],
   medium: [
     'hack', 'malware', 'ransomware', 'virus', 'exploit', 'vulnerability',
-    'suspicious', 'warning', 'alert', 'compromise'
+    'suspicious', 'warning', 'alert', 'compromise', 'unauthorized', 'intrusion',
+    'classified', 'confidential', 'sensitive', 'restricted', 'secret',
+    'phishing', 'social engineering', 'identity theft', 'fraud', 'scam',
+    'backdoor', 'zero-day', 'exploit', 'botnet', 'keylogger'
+  ],
+  behavioral: [
+    'suspicious', 'unusual', 'abnormal', 'erratic', 'concerning', 'alarming',
+    'radical', 'extreme', 'fanatic', 'obsessed', 'unstable', 'volatile',
+    'unpredictable', 'aggressive', 'hostile', 'threatening', 'intimidating'
+  ],
+  financial: [
+    'money laundering', 'fraud', 'illegal transaction', 'black money',
+    'hawala', 'shell company', 'tax evasion', 'financial crime',
+    'cryptocurrency', 'dark web', 'underground market', 'illegal trade'
   ]
 };
 
 // Severity multipliers for different categories
 const SEVERITY_MULTIPLIERS = {
-  critical: 10.0,  // Maximum severity
-  severe: 8.0,     // Very high severity
-  high: 6.0,       // High severity
-  medium: 4.0      // Medium severity
+  critical: 10.0,   // Maximum severity
+  severe: 7.0,      // Very high severity
+  high: 5.0,        // High severity
+  medium: 3.0,      // Medium severity
+  behavioral: 2.0,  // Behavioral indicators
+  financial: 2.5    // Financial crime indicators
 };
 
 // Context multipliers for threat assessment
 const CONTEXT_MULTIPLIERS = {
-  multipleLocations: 1.5,    // Multiple locations mentioned
-  timeSpecified: 1.3,        // Specific time/date mentioned
-  multipleKeywords: 1.4,     // Multiple danger words
-  proximityWords: 1.2,       // Words like "immediate", "soon", "today"
-  massTerms: 1.6            // Words indicating mass impact: "crowd", "public", "everyone"
-};
-
-// Helper function to check for proximity words
-const hasProximityWords = (text: string): boolean => {
-  const proximityWords = [
-    'immediate', 'soon', 'today', 'tonight', 'tomorrow', 'now',
-    'urgent', 'quickly', 'fast', 'rapid'
-  ];
-  return proximityWords.some(word => text.toLowerCase().includes(word));
-};
-
-// Helper function to check for mass impact terms
-const hasMassImpactTerms = (text: string): boolean => {
-  const massTerms = [
-    'crowd', 'public', 'everyone', 'population', 'city', 'mass', 'people',
-    'civilians', 'residents', 'citizens', 'community'
-  ];
-  return massTerms.some(word => text.toLowerCase().includes(word));
+  multipleLocations: 2.0,     // Multiple locations mentioned
+  timeSpecified: 1.5,         // Specific time/date mentioned
+  multipleKeywords: 2.0,      // Multiple danger words
+  proximityWords: 1.8,        // Words like "immediate", "soon", "today"
+  massTerms: 2.0,            // Words indicating mass impact
+  sensitiveData: 1.5,        // Contains sensitive information
+  coordination: 1.8,         // Indicates coordinated activity
+  infrastructure: 2.0,       // Critical infrastructure mentioned
+  repetition: 1.5,          // Same threat terms repeated
+  proximity: 1.7,           // Geographic proximity to sensitive locations
+  timing: 1.6,             // Time-based correlation
+  technicalDetail: 1.8,    // Presence of technical details
+  financialImpact: 1.5,    // Financial implications
+  crossBorder: 1.9,        // International/cross-border elements
+  socialMedia: 1.4,        // Social media involvement
+  encryption: 1.6,         // Use of encryption/security terms
+  darkWeb: 2.0            // Dark web references
 };
 
 interface ThreatIndicator {
@@ -73,9 +122,9 @@ interface ThreatIndicator {
 }
 
 interface Location {
-  city: string;
+  name: string;
+  type: 'metropolitan' | 'major' | 'state' | 'union-territory' | 'landmark' | 'critical';
   context: string;
-  coordinates?: { lat: number; lng: number };
 }
 
 interface TimeIndicator {
@@ -84,250 +133,902 @@ interface TimeIndicator {
   context: string;
 }
 
+interface ClueIndicator {
+  type: 'location' | 'time' | 'method' | 'target' | 'actor';
+  detail: string;
+  confidence: number;
+  context: string;
+  severity: number;
+  relatedTerms: string[];
+}
+
+interface LocationDetail {
+  name: string;
+  type: 'metropolitan' | 'major' | 'state' | 'union-territory' | 'landmark' | 'critical';
+  context: string;
+  coordinates?: {
+    lat: number;
+    lng: number;
+  };
+  nearbyLocations?: string[];
+  criticalInfrastructure?: string[];
+  populationDensity?: 'high' | 'medium' | 'low';
+  securityLevel?: 'high' | 'medium' | 'low';
+}
+
 export interface ThreatAnalysis {
   threatLevel: 'low' | 'medium' | 'high' | 'critical';
   score: number;
   indicators: ThreatIndicator[];
-  locations: Location[];
+  locations: LocationDetail[];
   timeIndicators: TimeIndicator[];
   summary: string;
+  clues: ClueIndicator[];
+  details: {
+    sensitiveData: boolean;
+    massImpact: boolean;
+    infrastructure: boolean;
+    timeProximity: boolean;
+    coordinatedActivity: boolean;
+    behavioralIndicators: string[];
+    technicalIndicators: string[];
+    financialIndicators: string[];
+    geopoliticalContext: string[];
+    relatedThreats: string[];
+    recommendedActions: string[];
+    confidenceScore: number;
+    severityBreakdown: {
+      technical: number;
+      physical: number;
+      social: number;
+      financial: number;
+    };
+    riskFactors: {
+      category: string;
+      level: number;
+      description: string;
+    }[];
+    timeline: {
+      detected: Date;
+      estimated: Date;
+      critical: Date;
+    };
+    locationDetails: {
+      primaryLocation?: LocationDetail;
+      affectedArea: string[];
+      criticalTargets: string[];
+      evacuationZones?: string[];
+      securityCheckpoints?: string[];
+    };
+    detectedPatterns: {
+      locations: {
+        name: string;
+        type: string;
+        nearbyInfrastructure?: string[];
+      }[];
+      timeReferences: {
+        specific: string[];
+        relative: string[];
+        duration: string[];
+      };
+      massImpactTerms: string[];
+      infrastructureRefs: string[];
+      coordinationIndicators: string[];
+    };
+  };
 }
 
-// Helper function to extract dates from text
-const extractDates = (text: string): TimeIndicator[] => {
-  const datePatterns = [
-    // DD/MM/YYYY or DD-MM-YYYY
-    /(\d{1,2})[/-](\d{1,2})[/-](\d{4})/g,
-    // DD Month YYYY
-    /(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+(\d{4})/gi,
-    // HH:MM format
-    /(\d{1,2}):(\d{2})(?:\s*[AaPp][Mm])?/g
+// Helper function to check for proximity words
+const hasProximityWords = (text: string): boolean => {
+  const proximityWords = [
+    'immediate', 'soon', 'today', 'tonight', 'tomorrow', 'now',
+    'urgent', 'quickly', 'fast', 'rapid', 'imminent', 'approaching'
   ];
-
-  const timeIndicators: TimeIndicator[] = [];
-  
-  for (const pattern of datePatterns) {
-    const matches = text.matchAll(new RegExp(pattern, 'g'));
-    for (const match of matches) {
-      const raw = match[0];
-      try {
-        const parsed = new Date(raw);
-        if (!isNaN(parsed.getTime())) {
-          timeIndicators.push({
-            raw,
-            parsed,
-            context: text.substring(Math.max(0, match.index! - 30), 
-                                 Math.min(text.length, match.index! + raw.length + 30))
-          });
-        }
-      } catch (e) {
-        console.error('Error parsing date:', raw);
-      }
-    }
-  }
-
-  return timeIndicators;
+  return proximityWords.some(word => text.toLowerCase().includes(word));
 };
 
-// Calculate severity score for individual words
-const calculateWordSeverity = (word: string, category: string): number => {
-  const baseScore = SEVERITY_MULTIPLIERS[category as keyof typeof SEVERITY_MULTIPLIERS] || 1.0;
-  
-  // Additional severity for compound terms
-  if (word.includes(' ')) {
-    return baseScore * 1.2; // 20% increase for compound terms
-  }
-  
-  return baseScore;
+// Helper function to check for mass impact terms
+const hasMassImpactTerms = (text: string): boolean => {
+  const massTerms = [
+    'crowd', 'public', 'everyone', 'population', 'city', 'mass', 'people',
+    'civilians', 'residents', 'citizens', 'community', 'gathering', 'assembly',
+    'demonstration', 'protest', 'rally', 'congregation', 'masses'
+  ];
+  return massTerms.some(word => text.toLowerCase().includes(word));
 };
 
-// Helper function to find danger words with context
-const findDangerWords = (text: string): ThreatIndicator[] => {
-  const indicators: ThreatIndicator[] = [];
+// Helper function to check for sensitive data indicators
+const hasSensitiveData = (text: string): boolean => {
+  const sensitiveTerms = [
+    'password', 'credential', 'secret', 'private', 'confidential', 'classified',
+    'restricted', 'sensitive', 'proprietary', 'internal', 'undisclosed'
+  ];
+  return sensitiveTerms.some(word => text.toLowerCase().includes(word));
+};
+
+// Helper function to check for infrastructure references
+const hasInfrastructureReferences = (text: string): boolean => {
+  const infrastructureTerms = [
+    'power plant', 'grid', 'pipeline', 'railway', 'airport', 'port', 'bridge',
+    'dam', 'facility', 'station', 'network', 'infrastructure', 'utility',
+    'water supply', 'communication', 'transportation', 'hospital'
+  ];
+  return infrastructureTerms.some(word => text.toLowerCase().includes(word));
+};
+
+// Indian city coordinates (add more as needed)
+const CITY_COORDINATES: { [key: string]: { lat: number; lng: number } } = {
+  'Patna': { lat: 25.5941, lng: 85.1376 },
+  'Delhi': { lat: 28.6139, lng: 77.2090 },
+  'Mumbai': { lat: 19.0760, lng: 72.8777 },
+  'Bangalore': { lat: 12.9716, lng: 77.5946 },
+  'Kolkata': { lat: 22.5726, lng: 88.3639 },
+  'Chennai': { lat: 13.0827, lng: 80.2707 },
+  'Hyderabad': { lat: 17.3850, lng: 78.4867 }
+};
+
+// Critical infrastructure types for cities
+const CITY_INFRASTRUCTURE: { [key: string]: string[] } = {
+  'Patna': [
+    'Patna Junction Railway Station',
+    'Jay Prakash Narayan International Airport',
+    'Gandhi Maidan',
+    'Bihar Legislative Assembly',
+    'Patna High Court',
+    'AIIMS Patna',
+    'Patna Medical College and Hospital',
+    'Bihar Museum',
+    'Golghar',
+    'Eco Park'
+  ],
+  // Add for other cities as needed
+};
+
+// Enhanced findLocations function
+const findLocations = (text: string): LocationDetail[] => {
+  const locations: LocationDetail[] = [];
+  const words = text.split(/\s+/);
   const lowerText = text.toLowerCase();
 
-  Object.entries(DANGER_WORDS).forEach(([category, words]) => {
-    words.forEach(word => {
-      const regex = new RegExp(`\\b${word}\\b`, 'gi');
-      let match;
-      while ((match = regex.exec(text)) !== null) {
-        const contextStart = Math.max(0, match.index - 30);
-        const contextEnd = Math.min(text.length, match.index + word.length + 30);
-        
-        indicators.push({
-          word: match[0],
-          category,
-          context: text.substring(contextStart, contextEnd),
-          severity: calculateWordSeverity(word, category)
-        });
+  // Function to add location with enhanced details
+  const addLocationWithDetails = (name: string, type: LocationDetail['type'], index: number) => {
+    const start = Math.max(0, index - 4);
+    const end = Math.min(words.length, index + 5);
+    const context = words.slice(start, end).join(' ');
+    
+    const location: LocationDetail = {
+      name,
+      type,
+      context,
+      coordinates: CITY_COORDINATES[name],
+      criticalInfrastructure: CITY_INFRASTRUCTURE[name] || [],
+      populationDensity: 'high',
+      securityLevel: 'high'
+    };
+
+    // Add nearby locations if available
+    if (CITY_INFRASTRUCTURE[name]) {
+      location.nearbyLocations = CITY_INFRASTRUCTURE[name].slice(0, 5);
+    }
+
+    locations.push(location);
+  };
+
+  // Check for locations in text
+  words.forEach((word, index) => {
+    // Check metropolitan cities
+    INDIAN_LOCATIONS.metropolitanCities.forEach(city => {
+      if (word.includes(city)) {
+        addLocationWithDetails(city, 'metropolitan', index);
       }
     });
-  });
 
-  return indicators;
-};
+    // Check major cities
+    INDIAN_LOCATIONS.majorCities.forEach(city => {
+      if (word.includes(city)) {
+        addLocationWithDetails(city, 'major', index);
+      }
+    });
 
-// Helper function to find Indian cities
-const findLocations = (text: string): Location[] => {
-  const locations: Location[] = [];
-  
-  INDIAN_CITIES.forEach(city => {
-    const regex = new RegExp(`\\b${city}\\b`, 'gi');
-    let match;
-    while ((match = regex.exec(text)) !== null) {
-      const contextStart = Math.max(0, match.index - 30);
-      const contextEnd = Math.min(text.length, match.index + city.length + 30);
-      
-      locations.push({
-        city: city,
-        context: text.substring(contextStart, contextEnd),
-        // Coordinates would be added here in a real implementation
-      });
-    }
+    // Check states
+    INDIAN_LOCATIONS.states.forEach(state => {
+      if (text.includes(state)) {
+        addLocationWithDetails(state, 'state', index);
+      }
+    });
+
+    // Check landmarks
+    INDIAN_LOCATIONS.landmarks.forEach(landmark => {
+      if (text.includes(landmark)) {
+        addLocationWithDetails(landmark, 'landmark', index);
+      }
+    });
   });
 
   return locations;
 };
 
-// Calculate overall threat score
+// Function to extract clues from text
+const extractClues = (
+  text: string,
+  indicators: ThreatIndicator[],
+  locations: LocationDetail[],
+  timeIndicators: TimeIndicator[]
+): ClueIndicator[] => {
+  const clues: ClueIndicator[] = [];
+
+  // Location clues
+  locations.forEach(location => {
+    clues.push({
+      type: 'location',
+      detail: `Target location identified: ${location.name}`,
+      confidence: 0.9,
+      context: location.context,
+      severity: 9,
+      relatedTerms: location.criticalInfrastructure || []
+    });
+  });
+
+  // Time clues
+  timeIndicators.forEach(time => {
+    clues.push({
+      type: 'time',
+      detail: `Time frame identified: ${time.raw}`,
+      confidence: 0.85,
+      context: time.context,
+      severity: 8,
+      relatedTerms: ['immediate', 'urgent', 'countdown']
+    });
+  });
+
+  // Method clues
+  indicators.forEach(indicator => {
+    if (indicator.category === 'critical') {
+      clues.push({
+        type: 'method',
+        detail: `Attack method identified: ${indicator.word}`,
+        confidence: 0.95,
+        context: indicator.context,
+        severity: 10,
+        relatedTerms: ['explosive', 'detonation', 'blast radius']
+      });
+    }
+  });
+
+  // Target clues
+  if (locations.length > 0) {
+    const location = locations[0];
+    if (location.criticalInfrastructure) {
+      location.criticalInfrastructure.forEach(target => {
+        clues.push({
+          type: 'target',
+          detail: `Potential target identified: ${target}`,
+          confidence: 0.7,
+          context: `Near ${location.name}`,
+          severity: 8,
+          relatedTerms: ['crowded', 'public', 'infrastructure']
+        });
+      });
+    }
+  }
+
+  return clues;
+};
+
+// Calculate severity score for individual words
+const calculateWordSeverity = (word: string, category: string): number => {
+  const baseScore = SEVERITY_MULTIPLIERS[category as keyof typeof SEVERITY_MULTIPLIERS] || 1.0;
+  return baseScore * 10; // Scale up the base score
+};
+
+// Helper function to find danger words with context
+const findDangerWords = (text: string): ThreatIndicator[] => {
+  const indicators: ThreatIndicator[] = [];
+  const words = text.toLowerCase().split(/\s+/);
+  
+  words.forEach((word, index) => {
+    for (const [category, categoryWords] of Object.entries(DANGER_WORDS)) {
+      if (categoryWords.some(dangerWord => {
+        // Check for exact match or as part of a word
+        return word.includes(dangerWord) || 
+               text.toLowerCase().includes(dangerWord);
+      })) {
+        // Get context (words before and after)
+        const start = Math.max(0, index - 3);
+        const end = Math.min(words.length, index + 4);
+        const context = words.slice(start, end).join(' ');
+        
+        indicators.push({
+          word: word,
+          category: category,
+          context: context,
+          severity: calculateWordSeverity(word, category)
+        });
+        break;
+      }
+    }
+  });
+  
+  return indicators;
+};
+
+// Enhanced threat score calculation
 const calculateThreatScore = (
-  indicators: ThreatIndicator[], 
-  locations: Location[],
+  indicators: ThreatIndicator[],
+  locations: LocationDetail[],
   timeIndicators: TimeIndicator[],
   text: string
 ): number => {
-  if (indicators.length === 0) return 0;
+  let score = 0;
+  const textLower = text.toLowerCase();
 
   // Base score from danger words
-  let score = indicators.reduce((sum, indicator) => sum + indicator.severity, 0);
+  indicators.forEach(indicator => {
+    score += calculateWordSeverity(indicator.word, indicator.category);
+  });
 
-  // Apply context multipliers
-  if (locations.length > 1) {
+  // Location-based scoring
+  if (locations.length > 0) {
     score *= CONTEXT_MULTIPLIERS.multipleLocations;
+    
+    // Check for proximity to sensitive locations
+    const hasSensitiveLocations = locations.some(loc => 
+      CRITICAL_LOCATIONS.some(critical => loc.name.toLowerCase().includes(critical))
+    );
+    if (hasSensitiveLocations) {
+      score *= CONTEXT_MULTIPLIERS.proximity;
+    }
   }
-  
+
+  // Time-based scoring
   if (timeIndicators.length > 0) {
     score *= CONTEXT_MULTIPLIERS.timeSpecified;
-  }
-  
-  if (indicators.length > 1) {
-    score *= CONTEXT_MULTIPLIERS.multipleKeywords;
-  }
-  
-  if (hasProximityWords(text)) {
-    score *= CONTEXT_MULTIPLIERS.proximityWords;
-  }
-  
-  if (hasMassImpactTerms(text)) {
-    score *= CONTEXT_MULTIPLIERS.massTerms;
+    
+    // Check for immediate threats
+    const hasImmediateThreat = timeIndicators.some(time => {
+      const timeDiff = time.parsed.getTime() - new Date().getTime();
+      return timeDiff <= 24 * 60 * 60 * 1000; // Within 24 hours
+    });
+    if (hasImmediateThreat) {
+      score *= CONTEXT_MULTIPLIERS.timing;
+    }
   }
 
-  // Check for critical combinations
-  const hasCriticalTerm = indicators.some(i => i.category === 'critical');
-  const hasSevereTerm = indicators.some(i => i.category === 'severe');
-  
-  if (hasCriticalTerm && hasSevereTerm) {
-    score *= 1.5; // 50% increase for critical + severe combination
+  // Technical detail scoring
+  if (hasTechnicalDetails(text)) {
+    score *= CONTEXT_MULTIPLIERS.technicalDetail;
   }
 
-  // Ensure the score is capped at 10
+  // Dark web references
+  if (hasDarkWebReferences(text)) {
+    score *= CONTEXT_MULTIPLIERS.darkWeb;
+  }
+
+  // Encryption/security terms
+  if (hasEncryptionTerms(text)) {
+    score *= CONTEXT_MULTIPLIERS.encryption;
+  }
+
+  // Cross-border elements
+  if (hasCrossBorderElements(text)) {
+    score *= CONTEXT_MULTIPLIERS.crossBorder;
+  }
+
+  // Social media involvement
+  if (hasSocialMediaReferences(text)) {
+    score *= CONTEXT_MULTIPLIERS.socialMedia;
+  }
+
+  // Additional context multipliers
+  if (hasProximityWords(text)) score *= CONTEXT_MULTIPLIERS.proximityWords;
+  if (hasMassImpactTerms(text)) score *= CONTEXT_MULTIPLIERS.massTerms;
+  if (hasSensitiveData(text)) score *= CONTEXT_MULTIPLIERS.sensitiveData;
+  if (hasInfrastructureReferences(text)) score *= CONTEXT_MULTIPLIERS.infrastructure;
+
+  // Normalize score to 0-10 range
   return Math.min(Math.max(score, 0), 10);
+};
+
+// New helper functions for enhanced analysis
+const hasTechnicalDetails = (text: string): boolean => {
+  const technicalTerms = [
+    'protocol', 'encryption', 'algorithm', 'payload', 'exploit',
+    'vulnerability', 'zero-day', 'backdoor', 'malware', 'ransomware',
+    'botnet', 'ddos', 'injection', 'buffer overflow', 'rootkit'
+  ];
+  return technicalTerms.some(term => text.toLowerCase().includes(term));
+};
+
+const hasDarkWebReferences = (text: string): boolean => {
+  const darkWebTerms = [
+    'dark web', 'darknet', 'tor', 'onion', 'hidden service',
+    'underground market', 'black market', 'silk road', 'cryptocurrency',
+    'bitcoin', 'monero', 'anonymous', 'encrypted chat'
+  ];
+  return darkWebTerms.some(term => text.toLowerCase().includes(term));
+};
+
+const hasEncryptionTerms = (text: string): boolean => {
+  const encryptionTerms = [
+    'encrypted', 'encryption', 'cipher', 'key', 'ssl', 'tls',
+    'vpn', 'proxy', 'tunnel', 'secure channel', 'pgp', 'gpg'
+  ];
+  return encryptionTerms.some(term => text.toLowerCase().includes(term));
+};
+
+const hasCrossBorderElements = (text: string): boolean => {
+  const crossBorderTerms = [
+    'international', 'cross-border', 'foreign', 'overseas',
+    'global', 'multinational', 'worldwide', 'transnational'
+  ];
+  return crossBorderTerms.some(term => text.toLowerCase().includes(term));
+};
+
+const hasSocialMediaReferences = (text: string): boolean => {
+  const socialMediaTerms = [
+    'social media', 'facebook', 'twitter', 'instagram', 'telegram',
+    'whatsapp', 'signal', 'discord', 'reddit', 'youtube'
+  ];
+  return socialMediaTerms.some(term => text.toLowerCase().includes(term));
 };
 
 // Determine threat level based on score
 const determineThreatLevel = (score: number): 'low' | 'medium' | 'high' | 'critical' => {
-  if (score >= 7) return 'critical';
-  if (score >= 5) return 'high';
-  if (score >= 3) return 'medium';
+  // Score is now normalized to 0-10 range
+  if (score >= 7.5) return 'critical';
+  if (score >= 5.0) return 'high';
+  if (score >= 2.5) return 'medium';
   return 'low';
 };
 
 // Generate threat summary
 const generateThreatSummary = (
-  indicators: ThreatIndicator[], 
-  locations: Location[], 
+  indicators: ThreatIndicator[],
+  locations: LocationDetail[],
   timeIndicators: TimeIndicator[],
   score: number
 ): string => {
-  const threatLevel = determineThreatLevel(score);
-  const criticalIndicators = indicators.filter(i => i.category === 'critical');
-  
-  let summary = '';
-  
-  // Add threat level context
-  if (criticalIndicators.length > 0) {
-    summary += `CRITICAL ALERT: Found ${criticalIndicators.length} high-risk indicators. `;
+  const parts: string[] = [];
+
+  // Add threat level
+  if (score >= 7.5) {
+    parts.push('CRITICAL THREAT LEVEL:');
+  } else if (score >= 5.0) {
+    parts.push('HIGH THREAT LEVEL:');
+  } else if (score >= 2.5) {
+    parts.push('MEDIUM THREAT LEVEL:');
+  } else {
+    parts.push('LOW THREAT LEVEL:');
   }
-  
-  // Location context
+
+  // Add indicator summary
+  if (indicators.length > 0) {
+    const categories = new Set(indicators.map(i => i.category));
+    parts.push(`Detected ${indicators.length} threat indicators across ${categories.size} categories.`);
+  }
+
+  // Add location summary
   if (locations.length > 0) {
-    summary += `Locations at risk: ${locations.map(l => l.city).join(', ')}. `;
+    const locationTypes = new Set(locations.map(l => l.type));
+    const criticalLocations = locations.filter(l => l.type === 'critical');
+    const metropolitanLocations = locations.filter(l => l.type === 'metropolitan');
+
+    if (criticalLocations.length > 0) {
+      parts.push(`Mentions ${criticalLocations.length} critical locations.`);
+    }
+    if (metropolitanLocations.length > 0) {
+      parts.push(`References ${metropolitanLocations.length} metropolitan cities.`);
+    }
+    parts.push(`Total locations mentioned: ${locations.length} across ${locationTypes.size} categories.`);
   }
-  
-  // Time context
+
+  // Add time sensitivity
   if (timeIndicators.length > 0) {
-    summary += `Time references: ${timeIndicators.map(t => t.raw).join(', ')}. `;
+    parts.push('Time-sensitive content detected.');
   }
-  
-  // Threat details
-  const categorizedThreats = indicators.reduce((acc, curr) => {
-    acc[curr.category] = acc[curr.category] || [];
-    acc[curr.category].push(curr.word);
-    return acc;
-  }, {} as Record<string, string[]>);
-  
-  Object.entries(categorizedThreats).forEach(([category, words]) => {
-    summary += `${category.toUpperCase()} threats detected: ${words.join(', ')}. `;
+
+  // Add threat context
+  if (score >= 7.5) {
+    parts.push('Immediate attention and response required.');
+  } else if (score >= 5.0) {
+    parts.push('Careful monitoring and assessment needed.');
+  }
+
+  return parts.join(' ');
+};
+
+// Time patterns for detection
+const TIME_PATTERNS = {
+  specific: [
+    /\d{1,2}[:h]\d{2}\s*(?:AM|PM|am|pm)?/,  // 11:00 AM, 11h00
+    /\d{1,2}\s*(?:AM|PM|am|pm)/,            // 11 AM
+    /\d{1,2}:\d{2}/,                        // 14:00
+    /\d{4}\s*(?:hrs|hours)?/                // 1400 hrs
+  ],
+  relative: [
+    /tonight/i,
+    /tomorrow/i,
+    /today/i,
+    /next\s+\d+\s+(?:hour|minute|day|week)s?/i,
+    /in\s+\d+\s+(?:hour|minute|day|week)s?/i,
+    /this\s+(?:morning|afternoon|evening|night)/i
+  ],
+  duration: [
+    /\d+\s+(?:hour|minute|day|week)s?/i,
+    /(?:few|couple of)\s+(?:hour|minute|day|week)s?/i
+  ]
+};
+
+// Mass impact patterns
+const MASS_IMPACT_PATTERNS = [
+  /crowd(?:ed)?/i,
+  /public/i,
+  /gathering/i,
+  /assembly/i,
+  /population/i,
+  /civilian/i,
+  /resident/i,
+  /people/i,
+  /community/i,
+  /mass/i
+];
+
+// Infrastructure patterns
+const INFRASTRUCTURE_PATTERNS = [
+  /station/i,
+  /airport/i,
+  /railway/i,
+  /hospital/i,
+  /school/i,
+  /college/i,
+  /university/i,
+  /mall/i,
+  /market/i,
+  /stadium/i,
+  /temple/i,
+  /mosque/i,
+  /church/i,
+  /bridge/i,
+  /highway/i,
+  /road/i
+];
+
+// Coordinated activity patterns
+const COORDINATION_PATTERNS = [
+  /group/i,
+  /team/i,
+  /cell/i,
+  /network/i,
+  /multiple/i,
+  /together/i,
+  /coordinate/i,
+  /simultaneous/i,
+  /planned/i,
+  /organized/i
+];
+
+interface DetectedPatterns {
+  locations: {
+    name: string;
+    type: string;
+    coordinates?: { lat: number; lng: number };
+    nearbyInfrastructure?: string[];
+  }[];
+  timeReferences: {
+    specific: string[];
+    relative: string[];
+    duration: string[];
+  };
+  massImpact: string[];
+  infrastructure: string[];
+  coordination: string[];
+}
+
+const findTimePatterns = (text: string): { specific: string[]; relative: string[]; duration: string[] } => {
+  const result = {
+    specific: [] as string[],
+    relative: [] as string[],
+    duration: [] as string[]
+  };
+
+  // Find specific times
+  TIME_PATTERNS.specific.forEach(pattern => {
+    const matches = text.match(pattern);
+    if (matches) {
+      result.specific.push(...matches);
+    }
   });
 
-  return summary;
+  // Find relative times
+  TIME_PATTERNS.relative.forEach(pattern => {
+    const matches = text.match(pattern);
+    if (matches) {
+      result.relative.push(...matches);
+    }
+  });
+
+  // Find durations
+  TIME_PATTERNS.duration.forEach(pattern => {
+    const matches = text.match(pattern);
+    if (matches) {
+      result.duration.push(...matches);
+    }
+  });
+
+  return result;
+};
+
+const findPatterns = (text: string): DetectedPatterns => {
+  const patterns: DetectedPatterns = {
+    locations: [],
+    timeReferences: {
+      specific: [],
+      relative: [],
+      duration: []
+    },
+    massImpact: [],
+    infrastructure: [],
+    coordination: []
+  };
+
+  // Find locations
+  const locations = findLocations(text);
+  patterns.locations = locations.map(loc => ({
+    name: loc.name,
+    type: loc.type,
+    coordinates: loc.coordinates,
+    nearbyInfrastructure: loc.criticalInfrastructure
+  }));
+
+  // Find time references
+  patterns.timeReferences = findTimePatterns(text);
+
+  // Find mass impact terms
+  MASS_IMPACT_PATTERNS.forEach(pattern => {
+    const matches = text.match(pattern);
+    if (matches) {
+      patterns.massImpact.push(...matches);
+    }
+  });
+
+  // Find infrastructure references
+  INFRASTRUCTURE_PATTERNS.forEach(pattern => {
+    const matches = text.match(pattern);
+    if (matches) {
+      patterns.infrastructure.push(...matches);
+    }
+  });
+
+  // Find coordination patterns
+  COORDINATION_PATTERNS.forEach(pattern => {
+    const matches = text.match(pattern);
+    if (matches) {
+      patterns.coordination.push(...matches);
+    }
+  });
+
+  return patterns;
 };
 
 // Main threat analysis function
 export const analyzeThreat = async (text: string): Promise<ThreatAnalysis> => {
   try {
-    // Find all indicators
+    const patterns = findPatterns(text);
     const indicators = findDangerWords(text);
     const locations = findLocations(text);
-    const timeIndicators = extractDates(text);
-
-    // Calculate threat score and level
+    const timeIndicators: TimeIndicator[] = []; // Implement date extraction if needed
+    const clues = extractClues(text, indicators, locations, timeIndicators);
     const score = calculateThreatScore(indicators, locations, timeIndicators, text);
     const threatLevel = determineThreatLevel(score);
-    const summary = generateThreatSummary(indicators, locations, timeIndicators, score);
 
-    const analysis: ThreatAnalysis = {
+    // Only include details that were actually detected
+    const details = {
+      sensitiveData: hasSensitiveData(text),
+      massImpact: patterns.massImpact.length > 0,
+      infrastructure: patterns.infrastructure.length > 0,
+      timeProximity: patterns.timeReferences.specific.length > 0 || patterns.timeReferences.relative.length > 0,
+      coordinatedActivity: patterns.coordination.length > 0,
+      behavioralIndicators: [],
+      technicalIndicators: [],
+      financialIndicators: [],
+      geopoliticalContext: [],
+      relatedThreats: [],
+      recommendedActions: [],
+      confidenceScore: calculateConfidenceScore(patterns),
+      severityBreakdown: {
+        technical: 0,
+        physical: score,
+        social: patterns.massImpact.length > 0 ? score : 0,
+        financial: 0
+      },
+      riskFactors: generateRiskFactors(patterns),
+      timeline: {
+        detected: new Date(),
+        estimated: new Date(),
+        critical: new Date()
+      },
+      locationDetails: {
+        primaryLocation: locations[0],
+        affectedArea: locations.map(loc => loc.name),
+        criticalTargets: locations.flatMap(loc => loc.criticalInfrastructure || []),
+        evacuationZones: locations.map(loc => `${loc.name} city center`),
+        securityCheckpoints: locations.map(loc => `${loc.name} major intersections`)
+      },
+      // Add detected patterns for display
+      detectedPatterns: {
+        locations: patterns.locations.map(loc => ({
+          name: loc.name,
+          type: loc.type,
+          nearbyInfrastructure: loc.nearbyInfrastructure
+        })),
+        timeReferences: patterns.timeReferences,
+        massImpactTerms: patterns.massImpact,
+        infrastructureRefs: patterns.infrastructure,
+        coordinationIndicators: patterns.coordination
+      }
+    };
+
+    return {
       threatLevel,
       score,
       indicators,
       locations,
       timeIndicators,
-      summary
+      clues,
+      summary: generateThreatSummary(indicators, locations, timeIndicators, score),
+      details
     };
-
-    // Store in Firebase asynchronously without waiting
-    if (threatLevel === 'high' || threatLevel === 'critical') {
-      const db = getFirestore();
-      addDoc(collection(db, 'threats'), {
-        ...analysis,
-        timestamp: serverTimestamp(),
-        text: text.slice(0, 1000) // Store first 1000 chars only
-      }).catch(error => {
-        console.error('Error storing threat:', error);
-      });
-    }
-
-    return analysis;
   } catch (error) {
     console.error('Error in threat analysis:', error);
-    // Return a default analysis in case of error
     return {
       threatLevel: 'low',
       score: 0,
       indicators: [],
       locations: [],
       timeIndicators: [],
-      summary: 'Error occurred during threat analysis'
+      clues: [],
+      summary: 'Error in threat analysis',
+      details: {
+        sensitiveData: false,
+        massImpact: false,
+        infrastructure: false,
+        timeProximity: false,
+        coordinatedActivity: false,
+        behavioralIndicators: [],
+        technicalIndicators: [],
+        financialIndicators: [],
+        geopoliticalContext: [],
+        relatedThreats: [],
+        recommendedActions: [],
+        confidenceScore: 0,
+        severityBreakdown: {
+          technical: 0,
+          physical: 0,
+          social: 0,
+          financial: 0
+        },
+        riskFactors: [],
+        timeline: {
+          detected: new Date(),
+          estimated: new Date(),
+          critical: new Date()
+        },
+        locationDetails: {
+          affectedArea: [],
+          criticalTargets: []
+        },
+        detectedPatterns: {
+          locations: [],
+          timeReferences: { specific: [], relative: [], duration: [] },
+          massImpactTerms: [],
+          infrastructureRefs: [],
+          coordinationIndicators: []
+        }
+      }
     };
   }
+};
+
+// Calculate confidence score based on detected patterns
+const calculateConfidenceScore = (patterns: DetectedPatterns): number => {
+  let confidence = 0;
+  let factors = 0;
+
+  // Location confidence
+  if (patterns.locations.length > 0) {
+    confidence += 0.3;  // 30% weight for location
+    factors++;
+  }
+
+  // Time reference confidence
+  if (patterns.timeReferences.specific.length > 0) {
+    confidence += 0.3;  // 30% weight for specific time
+    factors++;
+  } else if (patterns.timeReferences.relative.length > 0) {
+    confidence += 0.2;  // 20% weight for relative time
+    factors++;
+  }
+
+  // Mass impact confidence
+  if (patterns.massImpact.length > 0) {
+    confidence += 0.15;  // 15% weight for mass impact
+    factors++;
+  }
+
+  // Infrastructure confidence
+  if (patterns.infrastructure.length > 0) {
+    confidence += 0.15;  // 15% weight for infrastructure
+    factors++;
+  }
+
+  // Coordination confidence
+  if (patterns.coordination.length > 0) {
+    confidence += 0.1;  // 10% weight for coordination
+    factors++;
+  }
+
+  // Normalize confidence score
+  return factors > 0 ? (confidence / factors) * 10 : 0;
+};
+
+// Generate risk factors based on detected patterns
+const generateRiskFactors = (patterns: DetectedPatterns): { category: string; level: number; description: string }[] => {
+  const riskFactors: { category: string; level: number; description: string }[] = [];
+
+  // Location-based risks
+  if (patterns.locations.length > 0) {
+    patterns.locations.forEach(loc => {
+      if (loc.nearbyInfrastructure && loc.nearbyInfrastructure.length > 0) {
+        riskFactors.push({
+          category: 'Location',
+          level: 8,
+          description: `Critical infrastructure near ${loc.name}: ${loc.nearbyInfrastructure.join(', ')}`
+        });
+      }
+    });
+  }
+
+  // Time-based risks
+  if (patterns.timeReferences.specific.length > 0) {
+    riskFactors.push({
+      category: 'Timing',
+      level: 9,
+      description: `Specific time mentioned: ${patterns.timeReferences.specific.join(', ')}`
+    });
+  } else if (patterns.timeReferences.relative.length > 0) {
+    riskFactors.push({
+      category: 'Timing',
+      level: 7,
+      description: `Relative time frame: ${patterns.timeReferences.relative.join(', ')}`
+    });
+  }
+
+  // Mass impact risks
+  if (patterns.massImpact.length > 0) {
+    riskFactors.push({
+      category: 'Mass Impact',
+      level: 8,
+      description: `Potential mass casualty terms detected: ${patterns.massImpact.join(', ')}`
+    });
+  }
+
+  // Infrastructure risks
+  if (patterns.infrastructure.length > 0) {
+    riskFactors.push({
+      category: 'Infrastructure',
+      level: 8,
+      description: `Critical infrastructure mentioned: ${patterns.infrastructure.join(', ')}`
+    });
+  }
+
+  // Coordination risks
+  if (patterns.coordination.length > 0) {
+    riskFactors.push({
+      category: 'Coordination',
+      level: 7,
+      description: `Signs of coordinated activity: ${patterns.coordination.join(', ')}`
+    });
+  }
+
+  return riskFactors;
 };

@@ -111,10 +111,10 @@ const HomePage = () => {
       <footer className="relative z-10 bg-black/50 backdrop-blur-sm border-t border-red-500/10 py-8">
         <div className="max-w-7xl mx-auto px-4 text-center">
           <p className="text-gray-400">
-            2024 कवचNet. All rights reserved.
+            2024 कवचNet. All rights reserved Team DefendX.
           </p>
           <p className="text-gray-500 mt-2 text-sm">
-            Made with by Team DefendX
+            Made with ❤️ by Team DefendX
           </p>
         </div>
       </footer>
