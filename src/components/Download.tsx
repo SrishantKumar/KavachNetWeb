@@ -17,7 +17,7 @@ const Download = () => {
       title: 'Android App',
       description: 'Get the Android App for seamless decryption anywhere, anytime.',
       icon: Smartphone,
-      link: 'https://github.com/SrishantKumar/KavachNet/releases/download/KavachNet-v0.1/Net.apk',
+      link: 'https://github.com/SrishantKumar/KavachNet/releases/download/KavachNet-v0.2/KavachNet.apk',
       downloads: 5000
     }
   ]);
