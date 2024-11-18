@@ -9,17 +9,17 @@ const Testimonials = () => {
   const testimonials = [
     {
       text: "Best encryption tool I've ever used!",
-      author: "Sarah Chen",
+      author: "Akmal Hossain",
       role: "Security Engineer"
     },
     {
       text: "Incredibly intuitive and powerful.",
-      author: "Alex Rodriguez",
+      author: "Ayush Mishra",
       role: "Software Developer"
     },
     {
       text: "Perfect for learning cryptography.",
-      author: "Michael Park",
+      author: "Satyam Kumar Kesharwani",
       role: "Student"
     }
   ];
