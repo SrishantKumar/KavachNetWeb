@@ -10,7 +10,7 @@ const Download = () => {
       title: 'Chrome Extension',
       description: 'Download the Chrome Extension for quick access to encryption/decryption right in your browser.',
       icon: Chrome,
-      link: 'https://github.com/SrishantKumar/KavachNet-ChromeExtension/releases/download/KavachNetChromeExtension/Net.-.Extension.zip',
+      link: 'https://github.com/SrishantKumar/KavachNet-ChromeExtension/releases/download/KavachNet_v0.2/KavachNetExtension.zip',
       downloads: 10000
     },
     {
